@@ -21,7 +21,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: MastaTrill/Aetheron_platform
-          ref: 928e577381fce8691e509f2efe0be2d68094f262
+          ref: b08e2c52285d20cc8a94a44f9b0ae0e07e28f297
           persist-credentials: false
       - name: Install Node
         uses: actions/setup-node@v4
