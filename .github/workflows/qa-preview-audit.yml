@@ -1,0 +1,67 @@
+name: Audit deployed isolated Aetheron QA preview
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live-qa-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Verify deployed assets and public launch notices
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qa-evidence
+          base=https://mastatrill.github.io/aetheron-wallet-preview/
+          curl -fsSL --retry 3 "$base" -o qa-evidence/deployed-home.html
+          grep -q 'homepage-core.css' qa-evidence/deployed-home.html
+          grep -q 'public buying is not open' qa-evidence/deployed-home.html
+          grep -q 'basescan.org/token/0xecf7E17faE148C01E1b5008A31Dfd2d1B6608E4e' qa-evidence/deployed-home.html
+          curl -fsSL --retry 3 "$base/homepage-core.css?v=1.4.10" -o qa-evidence/deployed-homepage-core.css
+          curl -fsSL --retry 3 "$base/index.js?v=1.4.9" -o qa-evidence/deployed-index.js
+          grep -q 'ensureEthersReady' qa-evidence/deployed-index.js
+          echo 'QA preview, CSS and lazy wallet script verified'
+
+      - name: Capture actual deployed preview on mobile and desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          chrome="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
+          base=https://mastatrill.github.io/aetheron-wallet-preview/
+          "$chrome" --headless --no-sandbox --disable-gpu --hide-scrollbars --disable-dev-shm-usage --window-size=1440,900 --screenshot=qa-evidence/live-desktop.png "$base"
+          "$chrome" --headless --no-sandbox --disable-gpu --hide-scrollbars --disable-dev-shm-usage --window-size=390,844 --screenshot=qa-evidence/live-mobile.png "$base"
+          test -s qa-evidence/live-desktop.png
+          test -s qa-evidence/live-mobile.png
+
+      - name: Lighthouse on deployed QA URL
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes lighthouse@12 https://mastatrill.github.io/aetheron-wallet-preview/ --chrome-flags="--headless --no-sandbox --disable-dev-shm-usage" --only-categories=performance,accessibility,best-practices --output=json --output-path=qa-evidence/live-lighthouse.json --quiet
+          node --input-type=module -e '
+            import fs from "node:fs";
+            const r=JSON.parse(fs.readFileSync("qa-evidence/live-lighthouse.json","utf8"));
+            const v={
+              url:r.finalUrl,performance:Math.round(r.categories.performance.score*100),
+              accessibility:Math.round(r.categories.accessibility.score*100),
+              bestPractices:Math.round(r.categories["best-practices"].score*100),
+              cls:r.audits["cumulative-layout-shift"]?.numericValue,
+              tbtMs:r.audits["total-blocking-time"]?.numericValue,
+              lcpMs:r.audits["largest-contentful-paint"]?.numericValue
+            };
+            fs.writeFileSync("qa-evidence/live-lighthouse-summary.json",JSON.stringify(v,null,2));
+            console.log("Deployed QA Lighthouse:",v);
+          '
+
+      - name: Preserve isolated QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aetheron-deployed-qa-evidence
+          path: qa-evidence/
+          if-no-files-found: warn
+          retention-days: 7
