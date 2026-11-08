@@ -71,7 +71,11 @@ async function testScenario(browser, scenario) {
       return {overflow: getComputedStyle(nav).overflowY, scrollHeight: nav.scrollHeight, clientHeight: nav.clientHeight};
     });
     assert.equal(menu.overflow, 'auto', 'Mobile menu must scroll independently of the locked page');
-    assert.ok(menu.scrollHeight >= menu.clientHeight, 'Menu must have a valid scroll area');
+    assert.ok(menu.scrollHeight > menu.clientHeight, 'Long mobile menu must have an internal scroll range');
+    // A real visitor swipes inside the menu to find Connect Wallet; scrolling
+    // the page itself is intentionally disabled while the menu is open.
+    await page.$eval('#navLinks', nav => {nav.scrollTop = nav.scrollHeight;});
+    await page.waitForFunction(() => document.getElementById('navLinks').scrollTop > 0);
     const beforeClick = await page.evaluate(() => {
       const b = document.getElementById('connectBtn');
       const r = b?.getBoundingClientRect();
@@ -82,6 +86,10 @@ async function testScenario(browser, scenario) {
         atCenter:r ? document.elementFromPoint((r.left+r.right)/2,Math.max(0,Math.min(innerHeight-1,(r.top+r.bottom)/2)))?.outerHTML.slice(0,170) : null};
     });
     console.log('BEFORE_CONNECT_CLICK', scenario, JSON.stringify(beforeClick));
+    assert.ok(beforeClick.rect && beforeClick.rect.top >= 0 && beforeClick.rect.bottom <= 844,
+      'Wallet button must be inside the mobile viewport after scrolling the menu');
+    assert.ok(beforeClick.atCenter?.includes('connectBtn') || beforeClick.atCenter?.includes('Connect Wallet'),
+      'Wallet button must receive pointer events, not a page underneath');
     await page.click('#connectBtn');
     await page.waitForFunction(() => window.__aethQA?.clicked > 0, {timeout: 5000});
     await page.waitForFunction(() => window.__aethQA?.calls.includes('eth_requestAccounts'), {timeout: 35000});
