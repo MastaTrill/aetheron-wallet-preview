@@ -72,6 +72,16 @@ async function testScenario(browser, scenario) {
     });
     assert.equal(menu.overflow, 'auto', 'Mobile menu must scroll independently of the locked page');
     assert.ok(menu.scrollHeight >= menu.clientHeight, 'Menu must have a valid scroll area');
+    const beforeClick = await page.evaluate(() => {
+      const b = document.getElementById('connectBtn');
+      const r = b?.getBoundingClientRect();
+      const n = document.getElementById('navLinks');
+      return {url:location.href,ready:document.readyState,bound:b?.dataset.walletBound,
+        rect:r ? {top:r.top,bottom:r.bottom,left:r.left,right:r.right} : null,
+        navScrollTop:n?.scrollTop,navScrollHeight:n?.scrollHeight,navClientHeight:n?.clientHeight,
+        atCenter:r ? document.elementFromPoint((r.left+r.right)/2,Math.max(0,Math.min(innerHeight-1,(r.top+r.bottom)/2)))?.outerHTML.slice(0,170) : null};
+    });
+    console.log('BEFORE_CONNECT_CLICK', scenario, JSON.stringify(beforeClick));
     await page.click('#connectBtn');
     await page.waitForFunction(() => window.__aethQA?.clicked > 0, {timeout: 5000});
     await page.waitForFunction(() => window.__aethQA?.calls.includes('eth_requestAccounts'), {timeout: 35000});
@@ -93,13 +103,23 @@ async function testScenario(browser, scenario) {
   } catch (error) {
     record = {scenario, pass: false, error: String(error.message || error), errors};
     try {
-      record.diagnostic = await page.evaluate(() => ({
-        clicked: window.__aethQA?.clicked || 0, calls: window.__aethQA?.calls || [],
-        walletBound: document.getElementById('connectBtn')?.dataset.walletBound || null,
-        ethersLoaded: !!window.ethers,
-        dynamicEthers: [...document.scripts].some(s => s.src.includes('ethers.umd.min'))
-      }));
+      record.diagnostic = await page.evaluate(() => {
+        const b=document.getElementById('connectBtn');
+        const n=document.getElementById('navLinks');
+        const r=b?.getBoundingClientRect();
+        return {
+          url:location.href,ready:document.readyState,
+          clicked:window.__aethQA?.clicked || 0,calls:window.__aethQA?.calls || [],
+          walletBound:b?.dataset.walletBound || null,
+          buttonText:b?.textContent?.trim(),buttonRect:r?{top:r.top,bottom:r.bottom}:null,
+          navActive:n?.classList.contains('active'),navScroll:n?.scrollTop,
+          navHeight:n?.scrollHeight,navClient:n?.clientHeight,
+          ethersLoaded:!!window.ethers,
+          dynamicEthers:[...document.scripts].some(s=>s.src.includes('ethers.umd.min'))
+        };
+      });
     } catch {}
+    try {await page.screenshot({path:`qa-evidence/wallet-${scenario}-failure.png`});} catch {}
     throw error;
   } finally {
     results.cases.push(record);
