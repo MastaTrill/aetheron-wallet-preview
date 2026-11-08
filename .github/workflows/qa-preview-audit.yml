@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      - uses: actions/checkout@v4
       - name: Verify deployed assets and public launch notices
         shell: bash
         run: |
@@ -56,6 +57,13 @@ jobs:
             fs.writeFileSync("qa-evidence/live-lighthouse-summary.json",JSON.stringify(v,null,2));
             console.log("Deployed QA Lighthouse:",v);
           '
+
+      - name: Synthetic MetaMask-safe mobile Connect and Cancel browser tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --prefix qa-tools --no-save --no-audit --ignore-scripts puppeteer-core@24
+          CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser)" node qa-browser-interactions.cjs
 
       - name: Preserve isolated QA evidence
         if: always()
