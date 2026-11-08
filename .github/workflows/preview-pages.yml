@@ -1,0 +1,45 @@
+name: Publish isolated Aetheron wallet preview
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout certified source commit
+        uses: actions/checkout@v4
+        with:
+          repository: MastaTrill/Aetheron_platform
+          ref: 4eb20333cb7fa9e230f6ca8b8e9af8ea0080bea0
+          persist-credentials: false
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Run automated tests
+        run: npm test
+      - name: Build static website
+        run: npm run build
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Upload isolated preview artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - name: Publish to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
