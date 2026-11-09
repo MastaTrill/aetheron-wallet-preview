@@ -21,7 +21,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: MastaTrill/Aetheron_platform
-          ref: e7dac507547abc81948f865fd3750526a593fbfa
+          ref: 9ee3085af19cc0273d4c19b37ca81ddb7681e984
           persist-credentials: false
       - name: Install Node
         uses: actions/setup-node@v4
@@ -34,6 +34,20 @@ jobs:
         run: npm test
       - name: Build static website
         run: npm run build
+      - name: Verify built dashboard link and target document
+        shell: bash
+        run: |
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          import assert from 'node:assert/strict';
+          const home = fs.readFileSync('dist/index.html', 'utf8');
+          const dashboard = fs.readFileSync('dist/dashboard-enhanced.html', 'utf8');
+          assert.match(home, /href="dashboard-enhanced\.html" class="footer-social" aria-label="Open dashboard"/);
+          assert.doesNotMatch(home, /href="dashboard\.html"/);
+          assert.match(dashboard, /<!doctype html>/i);
+          assert.match(dashboard, /<title[^>]*>[^<]+<\/title>/i);
+          console.log('Isolated dashboard footer links to a complete dashboard document');
+          NODE
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload isolated preview artifact
