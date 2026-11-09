@@ -40,7 +40,7 @@ async function testScenario(browser, scenario) {
         if (method === 'eth_chainId') return state.chainId;
         if (method === 'net_version') return state.chainId === '0x2105' ? '8453' : '137';
         if (method === 'wallet_switchEthereumChain') {
-          if (params[0]?.chainId !== '0x2105') return rejected(method);
+          if (params[0]?.chainId !== '0x2105' || scenario === 'switch-reject') return rejected(method);
           state.chainId = '0x2105';
           (handlers.get('chainChanged') || []).forEach(cb => cb(state.chainId));
           return null;
@@ -96,6 +96,11 @@ async function testScenario(browser, scenario) {
     if (scenario === 'approve') {
       await page.waitForFunction(() => window.__aethQA?.chainId === '0x2105', {timeout: 20000});
       await page.waitForFunction(() => document.getElementById('walletConnectionStatus')?.hidden === false, {timeout: 20000});
+    } else if (scenario === 'switch-reject') {
+      await page.waitForFunction(() => window.__aethQA?.calls.includes('wallet_switchEthereumChain'), {timeout: 20000});
+      await page.waitForFunction(() =>
+        document.getElementById('connectBtn')?.textContent?.includes('Connect Wallet') &&
+        document.getElementById('walletConnectionStatus')?.hidden === true, {timeout: 10000});
     } else {
       await page.waitForFunction(() => document.getElementById('connectBtn')?.textContent?.includes('Connect Wallet'), {timeout: 10000});
     }
@@ -113,6 +118,13 @@ async function testScenario(browser, scenario) {
       assert.equal(state.walletVisible, false, 'Rejected request must not display connected wallet status');
       assert.equal(state.buttonConnected, false, 'Reject must not mark the Connect button connected');
       assert.ok(state.walletText.includes('Connect Wallet'), 'Cancel must preserve a usable Connect Wallet button');
+    } else if (scenario === 'switch-reject') {
+      assert.deepEqual(state.accounts, [fakeAddress], 'Account consent alone is not a verified Base connection');
+      assert.equal(state.chainId, '0x89', 'Denied Base switch must leave original unsupported chain intact');
+      assert.ok(state.calls.includes('wallet_switchEthereumChain'), 'The application must request an explicit switch to Base');
+      assert.equal(state.walletVisible, false, 'Denied network switch must not display connected wallet status');
+      assert.equal(state.buttonConnected, false, 'Denied network switch must not mark the Connect button connected');
+      assert.ok(state.walletText.includes('Connect Wallet'), 'Denied switch must preserve a usable Connect Wallet button');
     } else {
       assert.deepEqual(state.accounts, [fakeAddress], 'Simulated consent shares only fake address');
       assert.equal(state.walletVisible, true, 'Approved request must show connected wallet status');
@@ -212,6 +224,7 @@ async function testScenario(browser, scenario) {
     headless: true, args: ['--no-sandbox','--disable-dev-shm-usage','--disable-gpu']});
   try {
     await testScenario(browser, 'cancel');
+    await testScenario(browser, 'switch-reject');
     await testScenario(browser, 'approve');
     console.log('ISOLATED QA synthetic wallet checks PASSED');
   } finally {
