@@ -157,12 +157,14 @@ async function testScenario(browser, scenario) {
       assert.equal(disconnectHit.bound, 'true', 'Disconnect button must have a click handler');
       assert.equal(disconnectHit.hitInsideButton, true,
         'Disconnect click must not be intercepted by a menu overlay: ' + JSON.stringify(disconnectHit));
-      // Use a real mouse/pointer hit at the verified button center. Puppeteer's
-      // page.click auto-scroll can move the long mobile menu between hit-test and click.
-      await page.mouse.click(
-        await page.$eval('#disconnectWalletBtn', b => (b.getBoundingClientRect().left + b.getBoundingClientRect().right)/2),
-        await page.$eval('#disconnectWalletBtn', b => (b.getBoundingClientRect().top + b.getBoundingClientRect().bottom)/2)
-      );
+      // Mobile acceptance must dispatch an actual touch event at the
+      // verified hittable center; synthetic desktop mouse clicks can be
+      // ignored by a touch-emulated Chrome page.
+      const disconnectPoint = await page.$eval('#disconnectWalletBtn', b => {
+        const r = b.getBoundingClientRect();
+        return {x:(r.left+r.right)/2, y:(r.top+r.bottom)/2};
+      });
+      await page.touchscreen.tap(disconnectPoint.x, disconnectPoint.y);
       await page.waitForFunction(() =>
         document.getElementById('walletConnectionStatus')?.hidden === true &&
         document.getElementById('disconnectWalletBtn')?.hidden === true &&
@@ -174,7 +176,7 @@ async function testScenario(browser, scenario) {
         return {x,y,hit:document.elementFromPoint(x,y)===b || b.contains(document.elementFromPoint(x,y))};
       });
       assert.equal(reconnectHit.hit,true,'Reconnect button must be reachable by an actual pointer hit');
-      await page.mouse.click(reconnectHit.x,reconnectHit.y);
+      await page.touchscreen.tap(reconnectHit.x,reconnectHit.y);
       await page.waitForFunction(() =>
         document.getElementById('walletConnectionStatus')?.hidden === false &&
         window.__aethQA.calls.filter(x => x === 'eth_requestAccounts').length >= 2,
