@@ -127,9 +127,16 @@ async function testScenario(browser, scenario) {
     if (scenario === 'approve') {
       // Reconnect the same *fake* wallet after the app clears its state.
       // No real extension, signature, token approval or on-chain operation.
-      await page.evaluate(() => window.disconnectWallet());
+      const disconnectVisible = await page.evaluate(() => {
+        const control = document.getElementById('disconnectWalletBtn');
+        return !!control && !control.hidden && getComputedStyle(control).display !== 'none';
+      });
+      assert.equal(disconnectVisible, true, 'Approved wallet must provide a visible Disconnect control');
+      await page.$eval('#disconnectWalletBtn', button => button.scrollIntoView({ block: 'center' }));
+      await page.click('#disconnectWalletBtn');
       await page.waitForFunction(() =>
         document.getElementById('walletConnectionStatus')?.hidden === true &&
+        document.getElementById('disconnectWalletBtn')?.hidden === true &&
         document.getElementById('connectBtn')?.textContent.includes('Connect Wallet'));
       await page.click('#connectBtn');
       await page.waitForFunction(() =>
