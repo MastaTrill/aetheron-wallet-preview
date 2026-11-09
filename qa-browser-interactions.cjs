@@ -157,6 +157,15 @@ async function testScenario(browser, scenario) {
       assert.equal(disconnectHit.bound, 'true', 'Disconnect button must have a click handler');
       assert.equal(disconnectHit.hitInsideButton, true,
         'Disconnect click must not be intercepted by a menu overlay: ' + JSON.stringify(disconnectHit));
+      await page.evaluate(() => {
+        window.__aethDisconnectEvents = [];
+        const button = document.getElementById('disconnectWalletBtn');
+        for (const eventType of ['pointerdown','touchstart','touchend','mousedown','mouseup','click']) {
+          button.addEventListener(eventType, event => {
+            window.__aethDisconnectEvents.push({type:event.type, trusted:event.isTrusted});
+          }, {capture:true});
+        }
+      });
       // Mobile acceptance must dispatch an actual touch event at the
       // verified hittable center; synthetic desktop mouse clicks can be
       // ignored by a touch-emulated Chrome page.
@@ -165,6 +174,14 @@ async function testScenario(browser, scenario) {
         return {x:(r.left+r.right)/2, y:(r.top+r.bottom)/2};
       });
       await page.touchscreen.tap(disconnectPoint.x, disconnectPoint.y);
+      console.log('DISCONNECT_TAP_DIAGNOSTIC', JSON.stringify(await page.evaluate(() => ({
+        events:window.__aethDisconnectEvents,
+        buttonHidden:document.getElementById('disconnectWalletBtn')?.hidden,
+        statusHidden:document.getElementById('walletConnectionStatus')?.hidden,
+        buttonBound:document.getElementById('disconnectWalletBtn')?.dataset.walletBound,
+        buttonText:document.getElementById('connectBtn')?.textContent?.trim(),
+        activeElement:document.activeElement?.id || document.activeElement?.tagName
+      }))));
       await page.waitForFunction(() =>
         document.getElementById('walletConnectionStatus')?.hidden === true &&
         document.getElementById('disconnectWalletBtn')?.hidden === true &&
@@ -207,6 +224,8 @@ async function testScenario(browser, scenario) {
           buttonText:b?.textContent?.trim(),buttonRect:r?{top:r.top,bottom:r.bottom}:null,
           navActive:n?.classList.contains('active'),navScroll:n?.scrollTop,
           navHeight:n?.scrollHeight,navClient:n?.clientHeight,
+          disconnectEvents:window.__aethDisconnectEvents || [],
+          disconnectVisible:!!document.getElementById('disconnectWalletBtn') && !document.getElementById('disconnectWalletBtn').hidden,
           ethersLoaded:!!window.ethers,
           dynamicEthers:[...document.scripts].some(s=>s.src.includes('ethers.umd.min'))
         };
