@@ -124,6 +124,30 @@ async function testScenario(browser, scenario) {
     record = {scenario, pass: true, menu, requests: [...new Set(state.calls)], chainId: state.chainId,
       clicked: state.clicked, walletVisible: state.walletVisible, errors};
     await page.screenshot({path: `qa-evidence/wallet-${scenario}-mobile.png`});
+    if (scenario === 'approve') {
+      // Reconnect the same *fake* wallet after the app clears its state.
+      // No real extension, signature, token approval or on-chain operation.
+      await page.evaluate(() => window.disconnectWallet());
+      await page.waitForFunction(() =>
+        document.getElementById('walletConnectionStatus')?.hidden === true &&
+        document.getElementById('connectBtn')?.textContent.includes('Connect Wallet'));
+      await page.click('#connectBtn');
+      await page.waitForFunction(() =>
+        document.getElementById('walletConnectionStatus')?.hidden === false &&
+        window.__aethQA.calls.filter(x => x === 'eth_requestAccounts').length >= 2,
+        {timeout: 20000});
+      const again = await page.evaluate(() => ({
+        chainId: window.__aethQA.chainId,
+        walletStatus: document.getElementById('walletConnectionStatus')?.textContent.trim(),
+        calls: window.__aethQA.calls.slice()
+      }));
+      assert.equal(again.chainId, '0x2105', 'Reconnect must remain on Base Mainnet');
+      assert.ok(again.walletStatus.includes('0x1111'), 'Reconnect must restore account display');
+      assert.deepEqual(again.calls.filter(method => /sign|sendTransaction|sendCalls|personal_|approve|transfer/i.test(method)), [],
+        'Reconnect must not trigger signing or transaction requests');
+      assert.deepEqual(errors, [], 'Disconnect/reconnect must not cause browser page errors');
+      record.reconnect = {pass: true, chainId: again.chainId, walletVisible: true};
+    }
   } catch (error) {
     record = {scenario, pass: false, error: String(error.message || error), errors};
     try {
