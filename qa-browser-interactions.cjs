@@ -99,12 +99,25 @@ async function testScenario(browser, scenario) {
     const state = await page.evaluate(() => ({
       ...window.__aethQA,
       walletText: document.getElementById('connectBtn')?.textContent.trim(),
-      walletVisible: document.getElementById('walletConnected')?.classList.contains('hidden') === false
+      walletVisible: document.getElementById('walletConnectionStatus')?.hidden === false,
+      walletStatus: document.getElementById('walletConnectionStatus')?.textContent?.trim(),
+      buttonConnected: document.getElementById('connectBtn')?.classList.contains('connected') === true
     }));
     const forbidden = state.calls.filter(method => /sign|sendTransaction|sendCalls|personal_|approve|transfer/i.test(method));
     assert.deepEqual(forbidden, [], 'Wallet QA must not sign, approve tokens, or submit a transaction');
-    if (scenario === 'cancel') assert.deepEqual(state.accounts, [], 'Reject must leave account disconnected');
-    else assert.deepEqual(state.accounts, [fakeAddress], 'Simulated consent shares only fake address');
+    if (scenario === 'cancel') {
+      assert.deepEqual(state.accounts, [], 'Reject must leave account disconnected');
+      assert.equal(state.walletVisible, false, 'Rejected request must not display connected wallet status');
+      assert.equal(state.buttonConnected, false, 'Reject must not mark the Connect button connected');
+      assert.ok(state.walletText.includes('Connect Wallet'), 'Cancel must preserve a usable Connect Wallet button');
+    } else {
+      assert.deepEqual(state.accounts, [fakeAddress], 'Simulated consent shares only fake address');
+      assert.equal(state.walletVisible, true, 'Approved request must show connected wallet status');
+      assert.equal(state.buttonConnected, true, 'Approved request must mark wallet button connected');
+      assert.ok(state.walletStatus.includes('Base Mainnet'), 'Connected status must confirm Base Mainnet');
+      assert.ok(state.walletStatus.includes('0x1111'), 'Connected status must show the shared account address');
+    }
+    assert.deepEqual(errors, [], 'Neither cancelled nor approved connection may throw a browser page error');
     record = {scenario, pass: true, menu, requests: [...new Set(state.calls)], chainId: state.chainId,
       clicked: state.clicked, walletVisible: state.walletVisible, errors};
     await page.screenshot({path: `qa-evidence/wallet-${scenario}-mobile.png`});
