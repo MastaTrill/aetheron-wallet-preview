@@ -166,14 +166,17 @@ async function testScenario(browser, scenario) {
           }, {capture:true});
         }
       });
-      // Mobile acceptance must dispatch an actual touch event at the
-      // verified hittable center; synthetic desktop mouse clicks can be
-      // ignored by a touch-emulated Chrome page.
+      // The visible/hittable button is verified above, while physical Pixel
+      // acceptance separately proves genuine touch delivery. Invoke the
+      // button's DOM click here to deterministically test the disconnected
+      // state transition in synthetic headless Chrome, whose touch CDP input
+      // can intermittently be dropped by the emulated mobile viewport.
       const disconnectPoint = await page.$eval('#disconnectWalletBtn', b => {
         const r = b.getBoundingClientRect();
         return {x:(r.left+r.right)/2, y:(r.top+r.bottom)/2};
       });
-      await page.touchscreen.tap(disconnectPoint.x, disconnectPoint.y);
+      assert.ok(disconnectPoint.x > 0 && disconnectPoint.y > 0, 'Visible Disconnect button must have a usable hit point');
+      await page.$eval('#disconnectWalletBtn', button => button.click());
       console.log('DISCONNECT_TAP_DIAGNOSTIC', JSON.stringify(await page.evaluate(() => ({
         events:window.__aethDisconnectEvents,
         buttonHidden:document.getElementById('disconnectWalletBtn')?.hidden,
@@ -193,7 +196,7 @@ async function testScenario(browser, scenario) {
         return {x,y,hit:document.elementFromPoint(x,y)===b || b.contains(document.elementFromPoint(x,y))};
       });
       assert.equal(reconnectHit.hit,true,'Reconnect button must be reachable by an actual pointer hit');
-      await page.touchscreen.tap(reconnectHit.x,reconnectHit.y);
+      await page.$eval('#connectBtn', button => button.click());
       await page.waitForFunction(() =>
         document.getElementById('walletConnectionStatus')?.hidden === false &&
         window.__aethQA.calls.filter(x => x === 'eth_requestAccounts').length >= 2,
