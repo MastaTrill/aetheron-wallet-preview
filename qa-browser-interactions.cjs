@@ -95,6 +95,9 @@ async function testScenario(browser, scenario) {
     await page.waitForFunction(() => window.__aethQA?.calls.includes('eth_requestAccounts'), {timeout: 35000});
     if (scenario === 'approve') {
       await page.waitForFunction(() => window.__aethQA?.chainId === '0x2105', {timeout: 20000});
+      await page.waitForFunction(() => document.getElementById('walletConnectionStatus')?.hidden === false, {timeout: 20000});
+    } else {
+      await page.waitForFunction(() => document.getElementById('connectBtn')?.textContent?.includes('Connect Wallet'), {timeout: 10000});
     }
     const state = await page.evaluate(() => ({
       ...window.__aethQA,
