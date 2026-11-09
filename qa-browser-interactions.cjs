@@ -133,6 +133,18 @@ async function testScenario(browser, scenario) {
       });
       assert.equal(disconnectVisible, true, 'Approved wallet must provide a visible Disconnect control');
       await page.$eval('#disconnectWalletBtn', button => button.scrollIntoView({ block: 'center' }));
+      const disconnectHit = await page.evaluate(() => {
+        const button = document.getElementById('disconnectWalletBtn');
+        const rect = button?.getBoundingClientRect();
+        if (!rect) return {exists:false};
+        const hit = document.elementFromPoint((rect.left + rect.right)/2, (rect.top + rect.bottom)/2);
+        return {exists:true, bound:button.dataset.walletBound, top:rect.top, bottom:rect.bottom,
+          hitId:hit?.id || '', hitTag:hit?.tagName || '',
+          hitInsideButton:hit === button || button.contains(hit)};
+      });
+      assert.equal(disconnectHit.bound, 'true', 'Disconnect button must have a click handler');
+      assert.equal(disconnectHit.hitInsideButton, true,
+        'Disconnect click must not be intercepted by a menu overlay: ' + JSON.stringify(disconnectHit));
       await page.click('#disconnectWalletBtn');
       await page.waitForFunction(() =>
         document.getElementById('walletConnectionStatus')?.hidden === true &&
