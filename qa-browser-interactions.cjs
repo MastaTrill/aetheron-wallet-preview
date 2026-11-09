@@ -132,7 +132,7 @@ async function testScenario(browser, scenario) {
         return !!control && !control.hidden && getComputedStyle(control).display !== 'none';
       });
       assert.equal(disconnectVisible, true, 'Approved wallet must provide a visible Disconnect control');
-      await page.$eval('#disconnectWalletBtn', button => button.scrollIntoView({ block: 'center' }));
+      await page.$eval('#disconnectWalletBtn', button => button.scrollIntoView({ block: 'center', behavior: 'instant' }));
       const disconnectHit = await page.evaluate(() => {
         const button = document.getElementById('disconnectWalletBtn');
         const rect = button?.getBoundingClientRect();
